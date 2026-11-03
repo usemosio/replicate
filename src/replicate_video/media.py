@@ -39,8 +39,8 @@ def ffprobe() -> str:
     return _find("ffprobe")
 
 
-def run(args: list[str], *, capture: bool = True) -> subprocess.CompletedProcess:
-    proc = subprocess.run(args, capture_output=capture, text=True)
+def run(args: list[str], *, capture: bool = True, cwd: str | Path | None = None) -> subprocess.CompletedProcess:
+    proc = subprocess.run(args, capture_output=capture, text=True, cwd=cwd)
     if proc.returncode != 0:
         tail = (proc.stderr or "").strip().splitlines()[-5:]
         raise MediaError(f"{Path(args[0]).name} failed: " + " | ".join(tail))

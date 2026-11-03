@@ -22,14 +22,15 @@ from .audio import onsets
 
 def ssim_per_frame(ref: str, cand: str, w: int, h: int, fps: str) -> np.ndarray:
     with tempfile.TemporaryDirectory() as tmp:
-        stats = Path(tmp) / "ssim.log"
+        # A relative stats path: a Windows drive colon inside a filter graph reads as an option separator.
         graph = (
             f"[0:v]fps={fps},scale={w}:{h},format=yuv420p,setsar=1[r];"
             f"[1:v]fps={fps},scale={w}:{h},format=yuv420p,setsar=1[c];"
-            f"[r][c]ssim=stats_file='{stats.as_posix()}'"
+            "[r][c]ssim=stats_file=ssim.log"
         )
-        run([ffmpeg(), "-v", "error", "-i", ref, "-i", cand, "-lavfi", graph, "-f", "null", "-"])
-        values = [float(m) for m in re.findall(r"All:([\d.]+)", stats.read_text())]
+        run([ffmpeg(), "-v", "error", "-i", str(Path(ref).resolve()), "-i", str(Path(cand).resolve()),
+             "-lavfi", graph, "-f", "null", "-"], cwd=tmp)
+        values = [float(m) for m in re.findall(r"All:([\d.]+)", (Path(tmp) / "ssim.log").read_text())]
     return np.array(values)
 
 
