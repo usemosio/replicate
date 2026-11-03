@@ -28,15 +28,21 @@ def analyze(
     info = probe(video)
     log(f"probe: {info.width}x{info.height} {info.fps_text} fps {info.duration:.2f} s, audio={info.has_audio}")
 
+    log("measuring every frame for cuts...")
     sig = cuts.measure_signals(video, info=info)
     boundaries = cuts.find_boundaries(sig, sensitivity=sensitivity)
     shot_list = cuts.shots_from(boundaries, frames=len(sig.luma), fps=info.fps)
     log(f"cuts: {sum(b.kind == 'cut' for b in boundaries)} cuts, "
         f"{sum(b.kind == 'candidate' for b in boundaries)} candidates, {sum(b.kind == 'flash' for b in boundaries)} flashes")
 
-    found = {"y0": band[0], "y1": band[1], "present_share": None, "confidence": "given"} if band else captions.find_band(video, info)
-    use_band = found if found and (band or found["confidence"] == "high") else None
-    described = shots.describe(video, info, sig, shot_list, band=use_band)
+    log("looking for caption bands, then tracking the camera per shot...")
+    if band:
+        bands = [{"y0": band[0], "y1": band[1], "present_share": None, "from": 0.0, "to": info.duration,
+                  "kind": "captions", "confidence": "given"}]
+    else:
+        bands = captions.find_bands(video, info)
+    caption_bands = [b for b in bands if b["kind"] == "captions"]
+    described = shots.describe(video, info, sig, shot_list, bands=bands)
     frame_files = sheets.shot_frames(video, info, shot_list, out / "frames")
     for s, f in zip(described, frame_files):
         s["frames"] = f
@@ -48,10 +54,19 @@ def analyze(
     log(f"shots: {len(described)} described, contact sheet and strips written")
 
     cap = None
-    if use_band:
-        cap = captions.track(video, info, use_band, crops=out / "captions")
+    if caption_bands:
+        log("timing caption groups from the pixels...")
+        groups = []
+        for n, b in enumerate(caption_bands):
+            r = captions.track(video, info, b, crops=out / "captions", prefix=f"b{n + 1}_" if len(caption_bands) > 1 else "",
+                               start=max(0.0, b["from"] - 0.5), end=min(info.duration, b["to"] + 0.5))
+            groups += r["groups"]
+        groups.sort(key=lambda g: g["start"])
+        cap = {"bands": caption_bands, "titles": [b for b in bands if b["kind"] == "title"], "groups": groups}
         cap["ocr"] = captions.ocr(cap["groups"], out)
-        log(f"captions: band y {found['y0']:.3f}-{found['y1']:.3f}, {len(cap['groups'])} groups, ocr={cap['ocr']}")
+        cap["sheets"] = sheets.caption_sheet(out, cap["groups"], out / "captions.jpg")
+        where = ", ".join(f"y {b['y0']:.3f}-{b['y1']:.3f} ({b['from']}-{b['to']} s)" for b in caption_bands)
+        log(f"captions: {len(groups)} groups in {where}; {len(cap['titles'])} title band(s); ocr={cap['ocr']}")
     else:
         log("captions: no caption band found (pass --band y0,y1 if there is one)")
 
@@ -113,7 +128,8 @@ def summary(f: dict) -> str:
             c = "static"
         else:
             c = "; ".join(f"{m['move']} {'×' if m['move'] in ('push-in', 'pull-out') else ''}{m['amount']} "
-                          f"{m['start']:.2f}–{m['end']:.2f} {m['ease']}" for m in cam["moves"])
+                          f"{m['start']:.2f}–{m['end']:.2f} {m['ease']}{' (check: low confidence)' if m.get('confidence') == 'low' else ''}"
+                          for m in cam["moves"])
         if cam.get("confidence") == "low":
             c += " (low confidence)"
         pal = " ".join(p["hex"] for p in sh["palette"][:5])
@@ -122,13 +138,22 @@ def summary(f: dict) -> str:
         )
     cap = f.get("captions")
     if cap:
-        b = cap["band"]
-        lines += ["", "## Captions", "", f"Band at y {b['y0']:.3f}–{b['y1']:.3f} of the frame, {len(cap['groups'])} groups. "
-                  "Times are when the group appears on screen and when the lit word moves; read the words from the crops.",
-                  "", "| start | end | lit-word changes | text | crop |", "|---|---|---|---|---|"]
+        where = "; ".join(f"y {b['y0']:.3f}–{b['y1']:.3f} from {b['from']} to {b['to']} s" for b in cap["bands"])
+        lines += ["", "## Captions", "", f"{len(cap['groups'])} groups. Bands: {where}. "
+                  "Times are when the group appears on screen and when the lit word moves; read the words from "
+                  f"{', '.join(cap.get('sheets') or ['the crops'])} (every crop, labelled with its times). "
+                  "`off` = no word is lit at that moment (between words, or the group is shown plain). "
+                  "A colour marked ? sat on a bright coloured background and may be the background's colour.", ""]
+        for t in cap.get("titles", []):
+            lines.append(f"Text that mostly holds still (a title or a card) at y {t['y0']:.3f}–{t['y1']:.3f}, "
+                         f"{t['from']}–{t['to']} s.")
+        lines += ["", "| start | end | band y | lit-word changes | text | crop |", "|---|---|---|---|---|---|"]
         for g in cap["groups"]:
-            hl = ", ".join(f"{h['time']:.3f}{' ' + h['colour'] if h['colour'] else ' off'}" for h in g["highlights"][:4])
-            lines.append(f"| {g['start']:.3f} | {g['end']:.3f} | {hl} | {g.get('text', '')} | {g.get('crop', '')} |")
+            hl = ", ".join(
+                f"{h['time']:.3f} {h['colour'] + ('?' if h.get('colour_uncertain') else '') if h['colour'] else 'off'}"
+                for h in g["highlights"][:4]
+            )
+            lines.append(f"| {g['start']:.3f} | {g['end']:.3f} | {g['band']['y0']:.2f} | {hl} | {g.get('text', '')} | {g.get('crop', '')} |")
     a = f["audio"]
     if a.get("present"):
         lu = a["loudness"]

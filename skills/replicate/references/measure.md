@@ -10,6 +10,7 @@
 | `strips/<kind>_<time>.jpg` | the 8 consecutive frames around each boundary, labelled with time and frame number |
 | `frames/shotNN_{first,middle,last}.jpg` | three frames per shot |
 | `captions/NNN_<time>.png` | the caption band of each caption group, from its middle frame |
+| `captions.jpg` | every caption crop stacked with its times: read all the words here |
 | `audio.wav` | the soundtrack, untouched |
 | `transcript.json` | words with timestamps (`--transcribe`, needs the `transcribe` extra) |
 | `signals.json` | per-frame brightness and change signals, for your own plots |
@@ -32,7 +33,8 @@ Three detectors vote on every frame (pixel change, colour histogram, edge layout
 
 Moves come from feature tracking between consecutive frames, with the caption band and still overlays (badges,
 logos, UI) masked out. Each shot lists `moves`: `push-in`/`pull-out` with a zoom factor, `pan`/`tilt` as a share of
-the frame, with start, end and the closest ease.
+the frame, with start, end, the closest ease and `agreement` (the share of tracked points that follow the move). A
+move with low agreement, or a zoom beyond ×1.8 in under 3 s, is marked `confidence: low` ("check" in the summary).
 
 - Reads the picture, not the camera: a whole set sliding is a pan, a character walking at the lens is a push-in.
 - Flicker (fire, particles, rain, noise) adds false motion; a shot full of it can show a big push that is not there.
@@ -42,13 +44,19 @@ the frame, with start, end and the closest ease.
 
 ## Captions
 
-The band is the strip of the frame where text comes and goes most. Groups are timed from the band's pixels:
-`start`/`end` are when the group is on screen, `highlights` are when a lit word moves and its colour.
+Bands are strips of the frame where text comes and goes; a video can have several (captions that move higher for
+an ending, a band per speaker), each with its own time span. Text that mostly holds still (a title, a poll card) is
+listed as a title band, not tracked. Groups are timed from the band's pixels, whatever colour the words are:
+`start`/`end` are when the group is on screen, `highlights` are when the lit word moves and its colour, and `off`
+means no word is lit at that moment.
 
 - This is on-screen timing. Speech timing (`transcript.json`) runs 0.03–0.5 s earlier: editors light a word after
   it is said and group words their own way. Build captions from the pixel times.
-- The lit colour is the mean of bright saturated pixels in the band. A fire or a coloured set behind the band pulls
-  it off; read the real colour from the crop.
+- The lit colour is the median of bright saturated pixels inside the letters' outline. When the background behind
+  the band is bright and saturated (fire, sunset, a coloured set) the colour is marked uncertain (`?` in the
+  summary) and left out of style summaries: read it from the crop.
+- A white face or object with a dark outline crossing the band can read as a short group with no lit word; the
+  sheet shows it.
 - A caption that moves around the frame, sits in two bands, or is very thin may be missed: pass
   `--band y0,y1` (fractions of the height) from what you see.
 - Text: the `ocr` extra fills `text` per group; otherwise read the crops. OCR misreads stylised type, check it.

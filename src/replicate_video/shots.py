@@ -83,15 +83,16 @@ def _pair_transform(a: np.ndarray, b: np.ndarray, mask: np.ndarray | None):
     rot = float(np.degrees(np.arctan2(m[1, 0], m[0, 0])))
     h, w = a.shape
     moved = m @ np.array([w / 2, h / 2, 1.0])
-    return scale, float(moved[0] - w / 2), float(moved[1] - h / 2), rot
+    agree = float(inliers.sum() / max(1, good.sum()))  # share of tracked points that follow the same move
+    return scale, float(moved[0] - w / 2), float(moved[1] - h / 2), rot, agree
 
 
-def _overlay_mask(frames: np.ndarray, band: dict | None) -> np.ndarray:
+def _overlay_mask(frames: np.ndarray, bands: list[dict] | None) -> np.ndarray:
     """255 where features may be tracked: not the caption band, not overlays that stay still while the
     picture under them moves (badges, logos, UI)."""
     h, w = frames.shape[1:]
     mask = np.full((h, w), 255, np.uint8)
-    if band:
+    for band in bands or []:
         mask[max(0, int(band["y0"] * h) - 2) : min(h, int(band["y1"] * h) + 2)] = 0
     if len(frames) >= 4:
         std = frames[:: max(1, len(frames) // 40)].astype(np.float32).std(axis=0)
@@ -134,7 +135,7 @@ def _segments(t: np.ndarray, v: np.ndarray, *, thresh: float, min_pairs: int = 3
     return grown
 
 
-def camera(path: str | Path, info: Probe, shots: list[dict], *, band: dict | None = None,
+def camera(path: str | Path, info: Probe, shots: list[dict], *, bands: list[dict] | None = None,
            sample_fps: float | None = None, width: int = 320) -> list[dict]:
     """Estimate a 2D camera per shot from feature matches between consecutive frames.
 
@@ -151,15 +152,16 @@ def camera(path: str | Path, info: Probe, shots: list[dict], *, band: dict | Non
         # one shot at a time keeps memory flat on long videos; skip the first and last frame (cut blur)
         sel = decode(path, width=width, fps=rate, gray=True, info=info,
                      start=shot["start"] + 1 / info.fps, end=max(shot["start"] + 1 / info.fps, shot["end"] - 1 / info.fps))
-        mask = _overlay_mask(sel, band)
+        live = [b for b in bands or [] if b.get("from") is None or (b["from"] < shot["end"] and b["to"] > shot["start"])]
+        mask = _overlay_mask(sel, live)
         steps, misses = [], 0
         for fa, fb in zip(sel, sel[1:]):
             t = _pair_transform(fa, fb, mask)
             if t is None:
                 misses += 1
-                t = (1.0, 0.0, 0.0, 0.0)
+                t = (1.0, 0.0, 0.0, 0.0, 0.0)
             steps.append(t)
-        st = np.array(steps) if steps else np.zeros((0, 4))
+        st = np.array(steps) if steps else np.zeros((0, 5))
         logz = np.log(np.maximum(st[:, 0], 1e-3)) if len(st) else np.zeros(0)
         dx = st[:, 1] / width if len(st) else np.zeros(0)
         dy = st[:, 2] / sel.shape[1] if len(st) else np.zeros(0)
@@ -187,13 +189,20 @@ def camera(path: str | Path, info: Probe, shots: list[dict], *, band: dict | Non
                     "pan_x": "pan right" if amount < 0 else "pan left",
                     "pan_y": "tilt down" if amount < 0 else "tilt up",
                 }[kind]
-                entry["moves"].append({
+                agree = float(st[s:e, 4].mean())
+                mv = {
                     "move": move,
                     "start": round(float(times[s]), 3),
                     "end": round(float(times[min(e, len(times)) - 1] + 1 / rate), 3),
                     "amount": round(float(np.exp(amount)), 3) if kind == "zoom" else round(abs(amount), 3),
                     "ease": _ease(progress),
-                })
+                    "agreement": round(agree, 2),
+                }
+                # Few points agreeing = part of the picture moves on its own (flicker, a character walking at the
+                # lens); a huge zoom in a short time is more often that than a camera move.
+                if agree < 0.6 or (kind == "zoom" and abs(amount) > np.log(1.8) and mv["end"] - mv["start"] < 3):
+                    mv["confidence"] = "low"
+                entry["moves"].append(mv)
         entry["moves"].sort(key=lambda m: m["start"])
         entry["move"] = "static" if not entry["moves"] else max(
             entry["moves"], key=lambda m: abs(np.log(m["amount"])) * 2 if m["move"] in ("push-in", "pull-out") else m["amount"]
@@ -204,9 +213,9 @@ def camera(path: str | Path, info: Probe, shots: list[dict], *, band: dict | Non
     return out
 
 
-def describe(path: str | Path, info: Probe, sig: Signals, shots: list[dict], *, band: dict | None = None) -> list[dict]:
+def describe(path: str | Path, info: Probe, sig: Signals, shots: list[dict], *, bands: list[dict] | None = None) -> list[dict]:
     thumbs = decode(path, width=64, fps=4, info=info)
-    cams = camera(path, info, shots, band=band)
+    cams = camera(path, info, shots, bands=bands)
     out = []
     for shot, cam in zip(shots, cams):
         a, b = shot["start_frame"], shot["end_frame"]

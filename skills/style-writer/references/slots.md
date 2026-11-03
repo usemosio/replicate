@@ -28,8 +28,11 @@ move starts and lands (the measured ease), how far it goes, and what never moves
 ## look
 
 The rendering style (flat vector, cel, low-poly 3D, collage, live action, screen recording), light (key direction,
-rim, shadows, flicker), shading and texture, depth (layers, parallax, blur), and colour *roles*: which palette entry
-is the backdrop, the mid-tone, the accent, the text. A new brand fills the roles; the roles stay.
+rim, shadows, flicker), shading and texture, depth (layers, parallax, blur and how much), and colour *roles*: which
+palette entry is the backdrop, the mid-tone, the accent, the text. A new brand fills the roles; the roles stay. Say
+which effects belong to which scenes (a glow only where there is fire) and how a builder makes the look with code:
+an illustrated 3D look is layered SVG or CSS shapes with gradients and blur, and its camera moves are layers scaling
+at different rates.
 
 ## characters and objects
 
@@ -39,7 +42,8 @@ bend, idle motion, how speech shows. "None" when the style has none.
 ## type and captions
 
 Traits of the type (weight, case, width, outline or shadow, size relative to the frame), a redistributable family
-that matches them, where text sits, how a caption group pops in and changes, and the lit-word treatment.
+that matches them, where text sits, how many characters fit on a line, how a caption group pops in and changes, the
+lit-word treatment, and how framing makes room for captions (faces sit above the band, never behind it).
 
 ## motion grammar
 

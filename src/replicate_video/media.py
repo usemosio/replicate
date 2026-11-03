@@ -145,21 +145,27 @@ def decode(
     return arr.reshape(shape)
 
 
-def iter_frames(path: str | Path, *, width: int, info: Probe | None = None, gray: bool = False):
-    """Stream frames at the source rate as (index, array), without holding the whole video in memory."""
+def iter_frames(path: str | Path, *, width: int, info: Probe | None = None, gray: bool = False,
+                start: float = 0.0, end: float | None = None):
+    """Stream frames at the source rate as (frame number, array), without holding the whole video in memory.
+    Frame numbers count from the start of the video, also when `start` skips ahead."""
     info = info or probe(path)
     height = max(2, int(round(info.height * width / info.width / 2)) * 2)
     pix = "gray" if gray else "rgb24"
     channels = 1 if gray else 3
     size = width * height * channels
+    first = int(round(start * info.fps))
+    window = ["-ss", f"{first / info.fps:.6f}"] if first else []
+    if end is not None:
+        window += ["-t", f"{max(0.0, end - first / info.fps):.6f}"]
     proc = subprocess.Popen(
-        [ffmpeg(), "-v", "error", "-i", str(path), "-vf", f"scale={width}:{height}:flags=area", "-an",
-         "-f", "rawvideo", "-pix_fmt", pix, "-"],
+        [ffmpeg(), "-v", "error", *window[:2], "-i", str(path), *window[2:], "-vf", f"scale={width}:{height}:flags=area",
+         "-an", "-f", "rawvideo", "-pix_fmt", pix, "-"],
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
     )
     assert proc.stdout is not None
-    index = 0
+    index = first
     try:
         while True:
             buf = proc.stdout.read(size)

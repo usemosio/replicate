@@ -1,6 +1,6 @@
 {
   "name": "replicate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Replicate any video or its style: measure a reference, rebuild it as an editable project, check it frame by frame, and write the style down as a STYLE.md or a reusable skill.",
   "author": { "name": "Mosio", "url": "https://mosio.me" },
   "homepage": "https://github.com/usemosio/replicate",

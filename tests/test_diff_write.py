@@ -51,9 +51,14 @@ def test_analyze_write_check(clips, tmp_path):
 def test_check_flags_paths_and_media(tmp_path):
     d = tmp_path / "bad-skill"
     d.mkdir()
-    (d / "SKILL.md").write_text("---\nname: Bad Skill\ndescription: x\n---\nSee /home/me/ref.mp4\n")
+    (d / "SKILL.md").write_text("---\nname: Bad Skill\ndescription: x\n---\nSee /home/me/ref.mp4 by @maker_jo\n"
+                                "```bash\nrender -o out.mp4\n```\n")
     (d / "ref.mp4").write_bytes(b"0")
     problems = check(d)
     assert any("name" in p for p in problems)
     assert any("absolute local path" in p for p in problems)
     assert any("media file" in p for p in problems)
+    assert any("social handle" in p for p in problems)
+    assert any("video file name (ref.mp4)" in p for p in problems)
+    assert not any("out.mp4" in p for p in problems)
+    assert any("contains 'Jo'" in p for p in check(d, forbid=["Jo"]))

@@ -75,7 +75,7 @@ def cmd_strip(args) -> int:
     info = probe(args.video)
     a, b = args.range
     out = Path(args.out or f"strip_{a:.2f}-{b:.2f}.jpg")
-    strip(args.video, info, a, b, out, width=args.width, roi=args.roi, every=args.every)
+    strip(args.video, info, a, b, out, width=args.width, roi=args.roi, every=args.every, max_frames=args.max)
     print(out)
     return 0
 
@@ -83,7 +83,8 @@ def cmd_strip(args) -> int:
 def cmd_frame(args) -> int:
     from .media import frame_at
 
-    for t in args.times:
+    times = [float(x) for item in args.times for x in item.split(",") if x]
+    for t in times:
         out = Path(args.out_dir) / f"frame_{t:07.3f}.png"
         frame_at(args.video, t, out)
         print(out)
@@ -126,7 +127,7 @@ def cmd_write(args) -> int:
 def cmd_check(args) -> int:
     from .write import check
 
-    problems = check(args.path)
+    problems = check(args.path, forbid=args.forbid)
     for p in problems:
         print(p)
     if not problems:
@@ -158,12 +159,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--roi", type=_quad, help="x,y,w,h as fractions of the frame")
     s.add_argument("--every", type=int, default=1, help="keep every n-th frame")
     s.add_argument("--width", type=int, default=200)
+    s.add_argument("--max", type=int, default=48, help="at most this many frames; a longer range skips frames evenly")
     s.add_argument("-o", "--out")
     s.set_defaults(fn=cmd_strip)
 
     f = sub.add_parser("frame", help="full-size frames at given times")
     f.add_argument("video")
-    f.add_argument("times", type=float, nargs="+")
+    f.add_argument("times", nargs="+", help="seconds, space- or comma-separated (1.5 3,4.2)")
     f.add_argument("-o", "--out-dir", default=".")
     f.set_defaults(fn=cmd_frame)
 
@@ -185,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
 
     c = sub.add_parser("check", help="check a style file or skill folder is complete and shareable")
     c.add_argument("path")
+    c.add_argument("--forbid", action="append", default=[], help="a word or name that must not appear (repeatable): "
+                   "the reference's creator, title, brand or characters")
     c.set_defaults(fn=cmd_check)
 
     args = p.parse_args(argv)

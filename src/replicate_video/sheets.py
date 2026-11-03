@@ -61,12 +61,15 @@ def strip(
     width: int = 200,
     roi: tuple[float, float, float, float] | None = None,
     every: int = 1,
+    max_frames: int | None = 48,
 ) -> Path:
     """Consecutive frames from start to end (seconds), labelled with time and frame number.
 
     roi = (x, y, w, h) as fractions of the frame, to zoom on one region.
     """
     first = max(0, int(round(start * info.fps)))
+    if max_frames and (end - start) * info.fps / every > max_frames:
+        every = int(np.ceil((end - start) * info.fps / max_frames))
     src_w = width if roi is None else int(width / max(roi[2], 0.05))
     frames = decode(path, width=src_w, start=first / info.fps, end=end + 0.5 / info.fps, info=info)
     imgs = []
@@ -81,6 +84,23 @@ def strip(
     out.parent.mkdir(parents=True, exist_ok=True)
     tile(imgs, cols).save(out, quality=88)
     return out
+
+
+def caption_sheet(root: Path, groups: list[dict], out: Path, *, per_sheet: int = 40) -> list[str]:
+    """All caption crops stacked with their times, so every group's words can be read in one or two images."""
+    paths = []
+    rows = [(g, root / g["crop"]) for g in groups if g.get("crop") and (root / g["crop"]).exists()]
+    for n in range(0, len(rows), per_sheet):
+        imgs = []
+        for g, p in rows[n : n + per_sheet]:
+            im = Image.open(p).convert("RGB")
+            imgs.append(label(im, f"{stamp(g['start'])}-{stamp(g['end'])}"))
+        if not imgs:
+            continue
+        name = out.with_name(f"{out.stem}{'' if n == 0 else '-' + str(n // per_sheet + 1)}{out.suffix}")
+        tile(imgs, 1 if imgs[0].width > 300 else 2, gap=2).save(name, quality=90)
+        paths.append(name.name)
+    return paths
 
 
 def boundary_strips(path, info: Probe, boundaries: list[dict], folder: Path, *, around: int = 4) -> list[str]:
@@ -100,7 +120,8 @@ def shot_frames(path, info: Probe, shots: list[dict], folder: Path, *, width: in
     out = []
     for s in shots:
         picks = {
-            "first": s["start"] + 1 / info.fps,
+            # a little after the boundary, past the blur or flash of a transition
+            "first": s["start"] + min(0.2, s["duration"] / 4),
             "middle": (s["start"] + s["end"]) / 2,
             "last": max(s["start"], s["end"] - 2 / info.fps),
         }

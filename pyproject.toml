@@ -1,6 +1,6 @@
 [project]
 name = "replicate-video"
-version = "0.1.0"
+version = "0.2.0"
 description = "Measure a reference video and check a rebuild against it: cuts, shots, palette, camera, captions, sound, frame diff. Helper for the replicate and style-writer agent skills."
 readme = "README.md"
 license = "Apache-2.0"

@@ -63,10 +63,14 @@ Tested on a 20-second narrated animation (6 shots, one-word karaoke captions, fi
 
 - every hard cut found on its frame, including two that FFmpeg's scene score misses; the light flash that looks like
   a cut is labelled as one;
-- caption groups and lit-word changes timed to the frame from the pixels (34 groups in 20 s), which speech
-  recognition gets 0.03–0.5 s early;
+- caption groups and lit-word changes timed to the frame from the pixels, whatever colour state the words are in
+  (24 groups in 20 s against 22 by eye), which speech recognition gets 0.03–0.5 s early; a second caption band and a
+  poll card later in the video are found on their own;
 - camera pushes, pulls and pans with their start, end, amount and ease, with captions and still overlays masked
-  out of the tracking.
+  out of the tracking; a "push" that is really fire flicker is marked low confidence.
+
+An agent following the `replicate` skill rebuilt that clip in about 25 minutes, matching every cut, and scored
+highest against four other replication methods on the same clip (SSIM 0.837 against 0.805–0.817).
 
 Measurements say where to look; the skills make the agent confirm each one on the frames before building on it.
 
