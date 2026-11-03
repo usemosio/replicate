@@ -22,12 +22,12 @@ SLOT_RE = re.compile(r"<!--\s*FILL:")
 
 
 def _template(name: str) -> str:
-    return resources.files("replicate_video").joinpath("templates", name).read_text()
+    return resources.files("replicate_video").joinpath("templates", name).read_text(encoding="utf-8")
 
 
 def load(analysis: str | Path) -> dict:
     p = Path(analysis)
-    facts = json.loads((p / "facts.json" if p.is_dir() else p).read_text())
+    facts = json.loads((p / "facts.json" if p.is_dir() else p).read_text(encoding="utf-8"))
     facts["_dir"] = str(p if p.is_dir() else p.parent)
     return facts
 
@@ -258,15 +258,15 @@ def write(analyses: list[str | Path], out: str | Path, *, as_: str, title: str, 
     if as_ == "md":
         target = out if out.suffix == ".md" else out / "STYLE.md"
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(fill(_template("STYLE.md"), m, title=title, engine=engine))
-        (target.parent / "measurements.json").write_text(json.dumps(m, indent=2))
+        target.write_text(fill(_template("STYLE.md"), m, title=title, engine=engine), encoding="utf-8")
+        (target.parent / "measurements.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
         return target
     name = slugify(name or title)
     root = out / name if out.name != name else out
     (root / "references").mkdir(parents=True, exist_ok=True)
-    (root / "SKILL.md").write_text(fill(_template("SKILL.md"), m, title=title, name=name, engine=engine))
-    (root / "references" / "style.md").write_text(fill(_template("STYLE.md"), m, title=title, engine=engine))
-    (root / "references" / "measurements.json").write_text(json.dumps(m, indent=2))
+    (root / "SKILL.md").write_text(fill(_template("SKILL.md"), m, title=title, name=name, engine=engine), encoding="utf-8")
+    (root / "references" / "style.md").write_text(fill(_template("STYLE.md"), m, title=title, engine=engine), encoding="utf-8")
+    (root / "references" / "measurements.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
     return root
 
 
@@ -290,7 +290,7 @@ def check(path: str | Path, *, forbid: list[str] | None = None) -> list[str]:
         if not skill.exists() and not (p / "STYLE.md").exists():
             problems.append("no SKILL.md or STYLE.md in the folder")
         if skill.exists():
-            text = skill.read_text()
+            text = skill.read_text(encoding="utf-8")
             m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
             if not m:
                 problems.append("SKILL.md: missing YAML frontmatter")
@@ -316,7 +316,7 @@ def check(path: str | Path, *, forbid: list[str] | None = None) -> list[str]:
             if f.suffix.lower() in (".mp4", ".mov", ".webm", ".mkv", ".wav", ".mp3", ".m4a"):
                 problems.append(f"{f.relative_to(p) if p.is_dir() else f.name}: media file; a shareable style carries no reference footage or sound")
             continue
-        text = f.read_text(errors="replace")
+        text = f.read_text(encoding="utf-8", errors="replace")
         rel = f.relative_to(p) if p.is_dir() else f.name
         fenced = False
         for n, line in enumerate(text.splitlines(), 1):

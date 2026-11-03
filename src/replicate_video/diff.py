@@ -30,7 +30,7 @@ def ssim_per_frame(ref: str, cand: str, w: int, h: int, fps: str) -> np.ndarray:
         )
         run([ffmpeg(), "-v", "error", "-i", str(Path(ref).resolve()), "-i", str(Path(cand).resolve()),
              "-lavfi", graph, "-f", "null", "-"], cwd=tmp)
-        values = [float(m) for m in re.findall(r"All:([\d.]+)", (Path(tmp) / "ssim.log").read_text())]
+        values = [float(m) for m in re.findall(r"All:([\d.]+)", (Path(tmp) / "ssim.log").read_text(encoding="utf-8"))]
     return np.array(values)
 
 
@@ -183,5 +183,5 @@ def compare(reference: str, rebuild: str, out_dir: str | Path, *, sample_fps: fl
         "sound_offset_s": sound_offset(reference, rebuild) if ri.has_audio and ci.has_audio else None,
         "images": {"worst": "worst.jpg" if images else None, "shots": "shots.jpg" if heads else None},
     }
-    (out_dir / "diff.json").write_text(json.dumps(result, indent=2))
+    (out_dir / "diff.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     return result

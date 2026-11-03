@@ -26,7 +26,7 @@ def test_analyze_write_check(clips, tmp_path):
     out = tmp_path / "ref"
     facts = analyze(str(clips["captions"]), out, log=lambda *_: None)
     assert (out / "SUMMARY.md").exists() and (out / "contact.jpg").exists()
-    assert json.loads((out / "facts.json").read_text())["captions"]["groups"]
+    assert json.loads((out / "facts.json").read_text(encoding="utf-8"))["captions"]["groups"]
 
     skill = write([out], tmp_path / "skills", as_="skill", title="Test Style")
     assert skill.name == "test-style"
@@ -36,14 +36,14 @@ def test_analyze_write_check(clips, tmp_path):
 
     # an agent fills every slot: then the skill passes
     for f in [skill / "SKILL.md", skill / "references" / "style.md"]:
-        text = f.read_text()
+        text = f.read_text(encoding="utf-8")
         text = re.sub(r"<!--\s*FILL:[^>]*-->", "Filled from the frames.", text)
-        f.write_text(text)
+        f.write_text(text, encoding="utf-8")
     assert check(skill) == []
     assert main(["check", str(skill)]) == 0
 
     md = write([out], tmp_path / "md", as_="md", title="Test Style")
-    assert md.name == "STYLE.md" and SLOT_RE.search(md.read_text())
+    assert md.name == "STYLE.md" and SLOT_RE.search(md.read_text(encoding="utf-8"))
     assert (md.parent / "measurements.json").exists()
     assert facts["source"]["frames"] == 60
 
@@ -52,7 +52,7 @@ def test_check_flags_paths_and_media(tmp_path):
     d = tmp_path / "bad-skill"
     d.mkdir()
     (d / "SKILL.md").write_text("---\nname: Bad Skill\ndescription: x\n---\nSee /home/me/ref.mp4 by @maker_jo\n"
-                                "```bash\nrender -o out.mp4\n```\n")
+                                "```bash\nrender -o out.mp4\n```\n", encoding="utf-8")
     (d / "ref.mp4").write_bytes(b"0")
     problems = check(d)
     assert any("name" in p for p in problems)

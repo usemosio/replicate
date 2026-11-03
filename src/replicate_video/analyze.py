@@ -79,7 +79,7 @@ def analyze(
             if tr is None:
                 log("transcript: faster-whisper is not installed (pip install 'replicate-video[transcribe]')")
             else:
-                (out / "transcript.json").write_text(json.dumps(tr, indent=2, ensure_ascii=False))
+                (out / "transcript.json").write_text(json.dumps(tr, indent=2, ensure_ascii=False), encoding="utf-8")
                 snd["transcript"] = "transcript.json"
                 log(f"transcript: {len(tr['words'])} words ({tr['language']})")
 
@@ -93,9 +93,9 @@ def analyze(
         "images": {"contact": "contact.jpg"},
         "seconds": round(time.time() - started, 1),
     }
-    (out / "facts.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False))
-    (out / "signals.json").write_text(json.dumps(sig.to_dict()))
-    (out / "SUMMARY.md").write_text(summary(facts))
+    (out / "facts.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False), encoding="utf-8")
+    (out / "signals.json").write_text(json.dumps(sig.to_dict()), encoding="utf-8")
+    (out / "SUMMARY.md").write_text(summary(facts), encoding="utf-8")
     log(f"done in {facts['seconds']} s -> {out}/facts.json, SUMMARY.md")
     return facts
 
