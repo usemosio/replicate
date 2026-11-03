@@ -1,0 +1,12 @@
+{
+  "name": "replicate",
+  "owner": { "name": "Mosio", "url": "https://mosio.me" },
+  "description": "Video replication and style skills",
+  "plugins": [
+    {
+      "name": "replicate",
+      "source": "./",
+      "description": "Replicate any video or its style and turn it into a STYLE.md or a reusable skill"
+    }
+  ]
+}

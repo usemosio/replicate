@@ -1,0 +1,10 @@
+{
+  "name": "replicate",
+  "version": "0.1.0",
+  "description": "Replicate any video or its style: measure a reference, rebuild it as an editable project, check it frame by frame, and write the style down as a STYLE.md or a reusable skill.",
+  "author": { "name": "Mosio", "url": "https://mosio.me" },
+  "homepage": "https://github.com/usemosio/replicate",
+  "repository": "https://github.com/usemosio/replicate",
+  "license": "Apache-2.0",
+  "keywords": ["video", "replicate", "style", "motion", "hyperframes", "remotion", "skills"]
+}

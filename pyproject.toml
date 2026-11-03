@@ -1,0 +1,31 @@
+[project]
+name = "replicate-video"
+version = "0.1.0"
+description = "Measure a reference video and check a rebuild against it: cuts, shots, palette, camera, captions, sound, frame diff. Helper for the replicate and style-writer agent skills."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Mosio" }]
+dependencies = [
+  "numpy>=1.24",
+  "pillow>=10.0",
+  "opencv-python-headless>=4.8",
+]
+
+[project.optional-dependencies]
+transcribe = ["faster-whisper>=1.0"]
+ocr = ["rapidocr-onnxruntime>=1.3"]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/usemosio/replicate"
+
+[project.scripts]
+replicate-video = "replicate_video.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/replicate_video"]
